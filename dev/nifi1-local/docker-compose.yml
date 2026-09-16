@@ -1,0 +1,70 @@
+# Local NiFi 1.x dev environment for the migration tool.
+#
+# Brings up:
+#   - Apache NiFi 1.28.1        → https://localhost:8443/nifi
+#   - Apache NiFi Registry 1.28.1 → http://localhost:18080/nifi-registry
+#
+# First run pulls ~2 GB of images and NiFi takes ~2 min to become healthy.
+# See README.md in this directory for usage.
+
+services:
+  nifi:
+    image: apache/nifi:1.28.1
+    container_name: nifi1-dev
+    ports:
+      - "8443:8443"          # NiFi UI + REST API (HTTPS, self-signed)
+    environment:
+      # Single-user auth — DEV ONLY. Password must be >= 12 chars.
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: changeme123456
+      NIFI_WEB_HTTPS_HOST: 0.0.0.0
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_WEB_PROXY_HOST: localhost:8443
+      NIFI_JVM_HEAP_INIT: 1g
+      NIFI_JVM_HEAP_MAX: 2g
+    volumes:
+      - nifi_conf:/opt/nifi/nifi-current/conf
+      - nifi_state:/opt/nifi/nifi-current/state
+      - nifi_db:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance:/opt/nifi/nifi-current/provenance_repository
+      - nifi_logs:/opt/nifi/nifi-current/logs
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -kfs https://localhost:8443/nifi-api/system-diagnostics >/dev/null || exit 1"
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 150s
+    restart: unless-stopped
+
+  nifi-registry:
+    image: apache/nifi-registry:1.28.1
+    container_name: nifi-registry1-dev
+    ports:
+      - "18080:18080"        # Registry UI + REST API (HTTP, non-secure — dev only)
+    volumes:
+      - nifi_registry_db:/opt/nifi-registry/nifi-registry-current/database
+      - nifi_registry_storage:/opt/nifi-registry/nifi-registry-current/flow_storage
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -fs http://localhost:18080/nifi-registry-api/buckets >/dev/null || exit 1"
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  nifi_conf:
+  nifi_state:
+  nifi_db:
+  nifi_flowfile:
+  nifi_content:
+  nifi_provenance:
+  nifi_logs:
+  nifi_registry_db:
+  nifi_registry_storage:
